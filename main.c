@@ -108,11 +108,11 @@
 #define QUEEN_B 	0x05 
 #define KING_B 		0x06 
  
-#define PAWNS_W         0x11
+#define PAWNS_W     0x11
 #define ROOK_W 		0x12
 #define KNIGHT_W 	0x13 
 #define BISHOP_W 	0x14 
-#define QUEEN_W         0x15 
+#define QUEEN_W     0x15 
 #define KING_W 		0x16 
 
 
@@ -232,8 +232,14 @@ static bool                    m_saadc_calibrate = false;
 /*-- Global Variables--*/
 volatile uint8_t change_array[MAX_NUMBER_OF_CHANGES][2];
 uint8_t current_position[8]; 
-volatile uint8_t current_state[8];
+
+/*Holds the current board state every bit is place on the board*/
+volatile uint8_t current_state[8]; 
+
 uint8_t new_state[8];// Holds the new board state 
+
+ /* Holds the current board state with the figres names, 
+ each byte is figure description*/
 volatile uint8_t current_state_board[64] = {0};
 
 volatile int global_index;
@@ -1358,6 +1364,7 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
 
   for (line = 0; line < 8; line++)
   {
+    /*Check if new move happened on one of the lines*/
     if (current_state[line] != new_state[line])	
     {
       for(column = 0; column < 8; column++)
@@ -1417,7 +1424,7 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
         --change_array[change][1];
       }
 
-      if ((change_array[change][1] > DEBOUNCE_VAL) && (change_array[change][1] !=0xFF ))
+      if ((change_array[change][1] > DEBOUNCE_VAL) && (change_array[change][1] != 0xFF ))
       {
         ret_update= move_algo(change_array[change][0] ,false);
         if (ret_update==1)
@@ -1435,6 +1442,7 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
         }
         else if (ret_update==0)
         {
+          /*This functions sends error message to ble app*/
           send_err(0,position_eror);
           pause_game_flag = true ;
           //move_case = start_move;
@@ -1547,7 +1555,7 @@ int move_algo(uint8_t change_val, _Bool reset)
           
           move_case = move_phase_1;
           DEBOUNCE_VAL = DEBOUNCE_VAL_fast;
-          global_index =flag_castling+move_case;
+          global_index = flag_castling + move_case;
           current_state_board[place] = 0;
         } 
         else if ((!white_turn)&&(piece_type < 0x10)) 
@@ -1557,7 +1565,7 @@ int move_algo(uint8_t change_val, _Bool reset)
             flag_castling = true;
           move_case = move_phase_1;
           DEBOUNCE_VAL = DEBOUNCE_VAL_fast;
-          global_index =move_case;
+          global_index = move_case;
           current_state_board[place] = 0;
         }
         else if (type_and_place[1][0] == place)
@@ -1998,6 +2006,16 @@ int main(void)
           else 
             EOM_counter =0;
         }
+
+        /*If pause_game_flag is true that means error occured->
+          read the board position and compare it with  */
+        else 
+        {
+          
+        
+        
+        }
+        
       }
       //idle_state_handle();   
     }
