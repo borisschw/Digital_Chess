@@ -1,8 +1,8 @@
 
-// -----------------DCB Digital Chess Board ,all code functions are in this file ------------------ 
+// -----------------DCB Digital Chess Board ,all code functions are in this file ------------------
 // 2019_09_08_V00  first version for demo                                                         //
 // 2019_09_08_V01  fix ADC to none block mode                                                     //
-//                 fixed bugs in the new_state decleration                                        //  
+//                 fixed bugs in the new_state decleration                                        //
 // 2019_09_08_V02  fix ADC to block mode                                                          //
 // 2019_12_08_V03  fix algo and add End of move                                                   //
 //                  incress delay to the sample (10ms)                                            //
@@ -16,8 +16,13 @@
 //                  chnaged the fast and slow detection mechanisem                                //
 // 2019_12_10_V09   fixed balck casteling end of move bug                                         //
 // 2019_12_10_V10   add pawn at the last line                                                     //
+///
+
+/// @param Debug_off_BLE_on debug mode on/off
 #define Debug_off_BLE_on 1
+
 #define PCB_VER 1
+
 #include <stdint.h>
 #include <string.h>
 //#include "dcb.h"
@@ -36,7 +41,10 @@
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
-#define SAADC_CALIBRATION_INTERVAL 5              //Determines how often the SAADC should be calibrated relative to NRF_DRV_SAADC_EVT_DONE event. E.g. value 5 will make the SAADC calibrate every fifth time the NRF_DRV_SAADC_EVT_DONE is received.
+
+///Determines how often the SAADC should be calibrated relative to NRF_DRV_SAADC_EVT_DONE event. E.g. value 5 will make the SAADC calibrate every fifth time the NRF_DRV_SAADC_EVT_DONE is received.
+#define SAADC_CALIBRATION_INTERVAL 5
+
 #define SAADC_SAMPLES_IN_BUFFER   2               //Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
 #define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_4X  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
 #define SAADC_BURST_MODE 1                        //Set to 1 to enable BURST mode, otherwise set to 0.
@@ -103,17 +111,17 @@
 
 #define PAWNS_B 	0x01
 #define ROOK_B 		0x02
-#define KNIGHT_B 	0x03 
-#define BISHOP_B 	0x04 
-#define QUEEN_B 	0x05 
-#define KING_B 		0x06 
- 
-#define PAWNS_W     0x11
+#define KNIGHT_B 	0x03
+#define BISHOP_B 	0x04
+#define QUEEN_B 	0x05
+#define KING_B 		0x06
+
+#define PAWNS_W   0x11
 #define ROOK_W 		0x12
-#define KNIGHT_W 	0x13 
-#define BISHOP_W 	0x14 
-#define QUEEN_W     0x15 
-#define KING_W 		0x16 
+#define KNIGHT_W 	0x13
+#define BISHOP_W 	0x14
+#define QUEEN_W   0x15
+#define KING_W 		0x16
 
 
 /*Module Pin defines*/
@@ -149,7 +157,7 @@
 #define NBIT(n) (0xFF - (0x1U <<(n)))
 
 #define PHOTO_DIODE_DELAY_US 30
-#define ANALOG_MUX_DELAY_US 5 
+#define ANALOG_MUX_DELAY_US 5
 #define DEBOUNCE_VAL_slow 10
 #define DEBOUNCE_VAL_fast 0
 #define THRESHOLD 7
@@ -221,25 +229,34 @@ static ble_uuid_t m_adv_uuids[]          =                                      
 //  uint8_t checksum;
 //} Data_packet;
 
-volatile uint8_t data_packet[256]; 
+volatile uint8_t data_packet[256];
 //uint8_t* data_to_send;
 
 
 static uint32_t                m_adc_evt_counter = 0;
-static bool                    m_saadc_calibrate = false;      
+static bool                    m_saadc_calibrate = false;
 
 
 /*-- Global Variables--*/
+/**
+ * change array [change number][0:type of change; 1:number of times the change is persistant]
+ */
 volatile uint8_t change_array[MAX_NUMBER_OF_CHANGES][2];
-uint8_t current_position[8]; 
 
-/*Holds the current board state every bit is place on the board*/
-volatile uint8_t current_state[8]; 
 
-uint8_t new_state[8];// Holds the new board state 
+uint8_t current_position[8];
 
- /* Holds the current board state with the figres names, 
- each byte is figure description*/
+/**
+ * Holds the current board state every bit is place on the board
+ * */
+volatile uint8_t current_state[8];
+
+uint8_t new_state[8];// Holds the new board state
+
+ /**
+  * Holds the current board state with the figures names,
+  * each byte is figure description
+  */
 volatile uint8_t current_state_board[64] = {0};
 
 volatile int global_index;
@@ -269,6 +286,10 @@ volatile _Bool SOG_update_flag = true;
 volatile _Bool flag_castling;
 volatile uint16_t EOM_counter = 0;
 
+/**
+ * @brief Holds the initial board state
+ *
+ */
 uint8_t board_state_array[64] = {
   ROOK_W, KNIGHT_W, BISHOP_W, QUEEN_W, KING_W, BISHOP_W, KNIGHT_W, ROOK_W,
   PAWNS_W, PAWNS_W, PAWNS_W, PAWNS_W, PAWNS_W, PAWNS_W, PAWNS_W, PAWNS_W,
@@ -276,10 +297,12 @@ uint8_t board_state_array[64] = {
   0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,
-  PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, 
+  PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B, PAWNS_B,
   ROOK_B,KNIGHT_B,BISHOP_B,QUEEN_B,KING_B, BISHOP_B, KNIGHT_B, ROOK_B};
 
-
+/**
+ * @brief
+ */
 uint8_t board_lookup[32] = { 0,   //[0,0,0,0,0,0,0,0], 0
                             4,    //[0,0,0,0,0,1,0,0],  1
                             8,    //[0,0,0,0,1,0,0,0],  2
@@ -305,14 +328,14 @@ uint8_t board_lookup[32] = { 0,   //[0,0,0,0,0,0,0,0], 0
                             107,  //[0,1,1,0,1,0,1,1],
                             111,  //[0,1,1,0,1,1,1,1],
                             49,   //[0,0,1,1,0,0,0,1], 24 // fxed value 10.9.2019
-                            53,   //[0,0,1,1,0,1,0,1],   
+                            53,   //[0,0,1,1,0,1,0,1],
                             57,   //[0,0,1,1,1,0,0,1],
                             61,   //[0,0,1,1,1,1,0,1],
                             115,  //[0,1,1,1,0,0,1,1],
                             119,  //[0,1,1,1,0,1,1,1],
                             123,  //[0,1,1,1,1,0,1,1],
                             127   //[0,1,1,1,1,1,1,1]
-                            }; 
+                            };
 
 /**@brief Function for assert macro callback.
  *
@@ -325,7 +348,7 @@ uint8_t board_lookup[32] = { 0,   //[0,0,0,0,0,0,0,0], 0
  * @param[in] line_num    Line number of the failing ASSERT call.
  * @param[in] p_file_name File name of the failing ASSERT call.
  */
- 
+
 void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 {
     app_error_handler(DEAD_BEEF, line_num, p_file_name);
@@ -412,7 +435,7 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
             do
             {
                 //err_code = app_uart_put(p_evt->params.rx_data.p_data[i]);
-                data_packet[i] = p_evt->params.rx_data.p_data[i];           
+                data_packet[i] = p_evt->params.rx_data.p_data[i];
 
                 if ((err_code != NRF_SUCCESS) && (err_code != NRF_ERROR_BUSY))
                 {
@@ -420,9 +443,9 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
                     APP_ERROR_CHECK(err_code);
                 }
             } while (err_code == NRF_ERROR_BUSY);
-        }        
+        }
         recieved_data_flag = true;
-       
+
     }
     //free(temp_data);
 
@@ -835,7 +858,6 @@ static void advertising_init(void)
     ble_advertising_conn_cfg_tag_set(&m_advertising, APP_BLE_CONN_CFG_TAG);
 }
 
-
 /**@brief Function for initializing buttons and leds.
  *
  * @param[out] p_erase_bonds  Will be true if the clear bonding button was pressed to wake the application up.
@@ -910,19 +932,19 @@ void saadc_init(void)
 {
     uint32_t err_code;
     nrf_drv_saadc_config_t saadc_config;
-	
+
     //Configure SAADC
 
-    nrf_saadc_channel_config_t channel_config0 = NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0); 
+    nrf_saadc_channel_config_t channel_config0 = NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
     #ifdef PCB_VER
-      nrf_saadc_channel_config_t channel_config1 = NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN2); 
+      nrf_saadc_channel_config_t channel_config1 = NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN2);
     #else
-      nrf_saadc_channel_config_t channel_config1 = NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1); 
+      nrf_saadc_channel_config_t channel_config1 = NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
     #endif
     saadc_config.low_power_mode = true;                                     //Enable low power mode.
     saadc_config.resolution         = NRF_SAADC_RESOLUTION_10BIT;           //Set SAADC resolution to 12-bit. This will make the SAADC output values from 0 (when input voltage is 0V) to 2^12=2048 (when input voltage is 3.6V for channel gain setting of 1/6).
     saadc_config.oversample         = 0;        //disable.
-    saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;                 //Set SAADC interrupt to low priority. 
+    saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;                 //Set SAADC interrupt to low priority.
 
     err_code = nrfx_saadc_init(&saadc_config, saadc_callback);
     APP_ERROR_CHECK(err_code);
@@ -945,58 +967,58 @@ uint8_t data_packet_cs()//(Data_packet* data)
 {
     uint8_t i = 0;
     uint8_t checksum;
-    
+
     checksum = 0; // data_packet[] + data->command + data->length;
 
     /*length is onlt for data section , need to add 2 for header and command*/
     for (i = 0; i < data_packet[2] + 3; i++)
     {
       checksum = checksum + data_packet[i];
-    } 
+    }
 
-    if (checksum == data_packet[i])    
+    if (checksum == data_packet[i])
       return 0;
     else
       return checksum;
-      
+
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //----------------------------------------------------------------------send_ack---------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 uint32_t send_ack(uint8_t command, _Bool ACK)
-{  
+{
   //data_to_send = (uint8_t*) malloc(sizeof(uint8_t) * 6);
   uint8_t data_to_send[6] = {0};
   uint16_t length = 6;
   uint8_t recieved_checksum;
   uint32_t ret;
   uint8_t calc_checksum = 0;
-  
+
   if (command == ping_from_android)
     recieved_checksum = data_packet[3];
   else
     recieved_checksum = data_packet[data_packet[2] + 3];
 
-    
+
   data_to_send[0] = header;
   data_to_send[1] = command;
   data_to_send[2] = 2;
-  
+
   if (ACK)
     data_to_send[3] = 0x0A;
   else
-    data_to_send[3] = 0x0D;  
- 
+    data_to_send[3] = 0x0D;
+
   data_to_send[4] = recieved_checksum;
-    
+
   for(int i = 0; i < 5; i++)
-    calc_checksum += data_to_send[i]; 
+    calc_checksum += data_to_send[i];
 
   data_to_send[5] = calc_checksum;
 
-  ret = ble_nus_data_send(&m_nus, data_to_send, &length, m_conn_handle); 
-  
+  ret = ble_nus_data_send(&m_nus, data_to_send, &length, m_conn_handle);
+
   free(data_to_send);
 
   return ret;
@@ -1014,12 +1036,12 @@ void send_end_of_move(_Bool white)
   data_to_send1[2] = 0x01;
   if (white)
     data_to_send1[3] = 0x10;
-  else 
+  else
     data_to_send1[3] = 0x01;
 
   for (int i = 0; i < 4 ; i++)
   {
-    checksum += data_to_send1[i]; 
+    checksum += data_to_send1[i];
   }
 
   data_to_send1[4] = checksum;
@@ -1055,8 +1077,8 @@ int send_board(void)
     data_to_send1[67] = checksum;
     length = 68;
 
-    ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle); 
-                 
+    ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle);
+
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -1085,8 +1107,8 @@ int send_current_position(void)
     data_to_send1[12] = checksum;
     length = 13;
 
-    ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle); 
-                 
+    ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle);
+
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -1110,34 +1132,34 @@ void send_err(uint8_t err_type ,uint8_t err_pos)
     data_to_send1[5] = checksum;
     length = 6;
 
-    ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle); 
-                 
+    ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle);
+
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //------------------------------------------------------------------------init_dcb-------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 
-int init_dcb() 
+int init_dcb()
 {
   int i;
   /*Init GPIO*/
   nrf_gpio_cfg_output(BLOCK_ADDR0);
   nrf_gpio_cfg_output(BLOCK_ADDR1);
   nrf_gpio_cfg_output(BLOCK_ADDR2);
-  
+
   nrf_gpio_cfg_output(ADDR0);
-  nrf_gpio_cfg_output(ADDR1);  
+  nrf_gpio_cfg_output(ADDR1);
 
-  nrf_gpio_cfg_output(ANALOG_SELECT0);  
+  nrf_gpio_cfg_output(ANALOG_SELECT0);
   nrf_gpio_cfg_output(ANALOG_SELECT1);
-  
-     
-  nrf_gpio_cfg_input(ADC_BAT,NRF_GPIO_PIN_NOPULL); 
-  nrf_gpio_cfg_input(ADC_PD0,NRF_GPIO_PIN_NOPULL); 
-  nrf_gpio_cfg_input(ADC_PD1,NRF_GPIO_PIN_NOPULL); 
 
-  nrf_gpio_cfg_output(EN_PD);  
+
+  nrf_gpio_cfg_input(ADC_BAT,NRF_GPIO_PIN_NOPULL);
+  nrf_gpio_cfg_input(ADC_PD0,NRF_GPIO_PIN_NOPULL);
+  nrf_gpio_cfg_input(ADC_PD1,NRF_GPIO_PIN_NOPULL);
+
+  nrf_gpio_cfg_output(EN_PD);
   nrf_gpio_cfg_output(EN_AMP);
   nrf_gpio_cfg_output(EN_BLOCK);
   nrf_gpio_cfg_output(EN_SYS);
@@ -1150,7 +1172,7 @@ int init_dcb()
 
   for(i = 0; i < NUM_OF_CELLS / 8; i++)
     current_position[i] = 0;
-  
+
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -1161,7 +1183,7 @@ int set_addr(uint8_t addr_num)
 {
   if ((addr_num < 4) && (addr_num >= 0))
   {
-    
+
     switch(addr_num)
     {
       case 0:
@@ -1181,12 +1203,12 @@ int set_addr(uint8_t addr_num)
       case 3:
             nrf_gpio_pin_set(ADDR0);
             nrf_gpio_pin_set(ADDR1);
-        break;        
+        break;
     }
       return 0;
   }
 
-    else 
+    else
       return 1;
 }
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -1205,7 +1227,7 @@ int set_analog_mux(uint8_t ana_num)
             nrf_gpio_pin_clear(ANALOG_SELECT1);
         break;
       case 1:
-           
+
             nrf_gpio_pin_set(ANALOG_SELECT0);
             nrf_gpio_pin_clear(ANALOG_SELECT1);
         break;
@@ -1218,13 +1240,13 @@ int set_analog_mux(uint8_t ana_num)
       case 3:
             nrf_gpio_pin_set(ANALOG_SELECT0);
             nrf_gpio_pin_set(ANALOG_SELECT1);
-        break;  
+        break;
     }
 
      return 0;
-  }   
-   
-    else 
+  }
+
+    else
       return 1;
 }
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -1244,7 +1266,7 @@ int set_block(uint8_t block_num)
       case 1:
             nrf_gpio_pin_set(BLOCK_ADDR0);
             nrf_gpio_pin_clear(BLOCK_ADDR1);
-            nrf_gpio_pin_clear(BLOCK_ADDR2);          
+            nrf_gpio_pin_clear(BLOCK_ADDR2);
             break;
       case 2:
             nrf_gpio_pin_clear(BLOCK_ADDR0);
@@ -1276,8 +1298,8 @@ int set_block(uint8_t block_num)
             nrf_gpio_pin_set(BLOCK_ADDR0);
             nrf_gpio_pin_set(BLOCK_ADDR1);
             nrf_gpio_pin_set(BLOCK_ADDR2);
-            break; 
-      
+            break;
+
       }
 
       return 0;
@@ -1288,6 +1310,12 @@ int set_block(uint8_t block_num)
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
 //---------------------------------------------------------------------- read_board_position----------------------------------------------------------------//
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Read the board position to new_state[8].
+ * It sets the Muxes and buffers gpio
+ *
+ * @return int
+ */
 int read_board_position(void)
 {
   static uint8_t index_B;
@@ -1295,7 +1323,7 @@ int read_board_position(void)
   uint8_t line_val0;
   uint8_t line_val1;
   a = 1;
- 
+
 
   nrf_gpio_pin_set(EN_SYS);
   nrf_gpio_pin_set(EN_PD);
@@ -1303,29 +1331,29 @@ int read_board_position(void)
   nrf_gpio_pin_set(EN_BLOCK);
   nrf_gpio_pin_set(TP5);
   nrf_delay_us(PHOTO_DIODE_DELAY_US);
-  
-  /* Scanning the board 32 times and each 
+
+  /* Scanning the board 32 times and each
   * time get 2 cells at a time
   */
   line_val0 =0;
   line_val1 =0;
   for (index_B = 0; index_B < NUM_OF_CELLS/2; index_B++)
-  { 
+  {
     global_index = index_B;
     //nrf_gpio_pin_set(TP2);
     nrf_gpio_pin_set(TP5);
     set_block(board_lookup[index_B] >> 4);
-    set_addr((board_lookup[index_B] >> 2) & 3);   
+    set_addr((board_lookup[index_B] >> 2) & 3);
     set_analog_mux((board_lookup[index_B]) & 3);
     nrf_gpio_pin_clear(TP5);
 
     nrf_delay_us(ANALOG_MUX_DELAY_US);
-    read_adc(&ADC_Val);    // added the & simbol due to compailer warning 
+    read_adc(&ADC_Val);    // added the & simbol due to compailer warning
     if (ADC_Val[0] == true)
-      line_val0 = line_val0 | BIT(index_B % BITS_IN_BYTE);  // set bit      
+      line_val0 = line_val0 | BIT(index_B % BITS_IN_BYTE);  // set bit
 
     if (ADC_Val[1] == true)
-      line_val1 = line_val1 | BIT(index_B % BITS_IN_BYTE); // set bit   
+      line_val1 = line_val1 | BIT(index_B % BITS_IN_BYTE); // set bit
 
     if(((index_B+1) % BITS_IN_BYTE) == 0) // if scanned a line - update the array
     {
@@ -1333,23 +1361,29 @@ int read_board_position(void)
       new_state[((2 * index_B) / BITS_IN_BYTE)] = line_val1;
       line_val0 =0;
       line_val1 =0;
-    } 
-    
+    }
+
   }
 
   //nrf_gpio_pin_clear(EN_PD);
-  nrf_gpio_pin_clear(EN_BLOCK); 
+  nrf_gpio_pin_clear(EN_BLOCK);
   nrf_gpio_pin_clear(EN_AMP);
   nrf_gpio_pin_clear(EN_SYS);
   set_block(board_lookup[0] >> 4);
-  set_addr((board_lookup[0] >> 2) & 3);   
+  set_addr((board_lookup[0] >> 2) & 3);
   set_analog_mux((board_lookup[0]) & 3);
-  
+
   return 0;
 }
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
 //------------------------------------------------------------------------ compare_block -------------------------------------------------------------//
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Find Changes in the board.
+ * Compares the current_state[8] and new_state[8] and update change_array[8][3].
+ *
+ * @return int
+ */
 int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
 {
   int i,j;
@@ -1357,7 +1391,14 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
   volatile uint8_t column;
   volatile uint8_t current_bit;
   volatile uint8_t new_bit;
+
+  /* Change_location:
+   * Bit       7         |6    |5    |4     |3     |2    |1    |0
+   * meaning : add/remove|line2|line1|line90|------|col2 |col1 |col0
+  */
   volatile static uint8_t change_location;
+
+
   volatile static uint8_t change;
   volatile static _Bool flag_new_change;
   uint8_t ret_update;
@@ -1365,7 +1406,7 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
   for (line = 0; line < 8; line++)
   {
     /*Check if new move happened on one of the lines*/
-    if (current_state[line] != new_state[line])	
+    if (current_state[line] != new_state[line])
     {
       for(column = 0; column < 8; column++)
       {
@@ -1373,45 +1414,54 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
         new_bit     = ((new_state[line]     >> column) & 0x01) ;
         if(current_bit != new_bit)
         {
-          //change_val structure [1(added)/0(removed), col2,col1,col0,0, line2, line1, line0] 
-          change_location = (line<<4) + column ; 
-          
-          if (new_bit) // a piece was placed on the squre
-            change_location = change_location | 0x80; 
+          //change_val structure [1(added)/0(removed), col2,col1,col0,0, line2, line1, line0]
+
+          //MSB nibble is the line number, LSB nibble is the column number
+          change_location = (line<<4) + column ;
+
+          /* A piece was placed on the squre; MSB bit is add/remove piece. */
+          if (new_bit)
+            change_location = change_location | 0x80;
 
           flag_new_change = true;
-          for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++) 
+          for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++)
           {
             if (change_array[change][0] == change_location)
-            {	
+            {
                 /* ADD 2 in case of change and subtruct 1 from everybody later so
-                   eventually add 1 to the new changes.
+                 * eventually add 1 to the new changes.
                  */
-                change_array [change][1] = change_array[change][1] + 2;                              
+                change_array [change][1] = change_array[change][1] + 2;
                 flag_new_change = false;
                 break; // ---- verify it isn't exiting the function but only the loop---
             }
           }
-
-          if (flag_new_change) // if the change happned for the first time.
+          /* if the change happned for the first time.
+          *  set the counter (change_array[change][1]) to 0x01
+          * */
+          if (flag_new_change)
           {
-            for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++) 
+            /*Find an empty space (which is still in initail state) to save the new change*/
+            for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++)
             {
               if (change_array[change][0] == INIT_CHANGE_VALUE)
-              {	
+              {
                   change_array[change][0] = change_location;
-                  change_array[change][1] = 0x01;                 
+                  change_array[change][1] = 0x01;
                   break;
               }
             }
           }
         }
-      }	
-    }		
+      }
+    }
   }
 
-  for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++) 
+  for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++)
   {
+    /*If there there is value in change_location, but the counter = 0 ->
+    * -> something is not correct
+    */
     if (change_array[change][0]!=INIT_CHANGE_VALUE)
     {
       if (change_array[change][1] == 0x00)
@@ -1421,32 +1471,44 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
       }
       else
       {
+        /*Subtract 1 from the counter that was increased by 2 before*/
         --change_array[change][1];
       }
-
+      /* Check if enough time passed (change_array[change][1] <=> kind of a timer)
+      *  so the change in piece is stable
+      */
       if ((change_array[change][1] > DEBOUNCE_VAL) && (change_array[change][1] != 0xFF ))
       {
-        ret_update= move_algo(change_array[change][0] ,false);
-        if (ret_update==1)
+        /*Check if the move is correct.
+          1-> legal move
+          0-> fault move
+        */
+        ret_update = move_algo(change_array[change][0] ,false);
+
+        if (ret_update == 1)
         {
           line   = (change_array[change][0]>>4) & 0x07;
           column = change_array[change][0] & 0x07;
+
+          /*If the piece was set(grater than 0x79 means MSB == "1")
+            Pay attention: the MSB bit of low nibble is not used and equal to 0
+            that's why the 0x77...0x7F are impossible values.*/
           if (change_array[change][0]>0x79)
             current_state[line]= current_state[line] | BIT(column);
-          else 
+          else /*piece was removed*/
             current_state[line]= current_state[line] & NBIT(column);
-          
+
           change_array[change][0] = INIT_CHANGE_VALUE;
           change_array[change][1] = INIT_CHANGE_VALUE;
           //send_current_position();
         }
-        else if (ret_update==0)
+        else if (ret_update==0) /*Illigal move*/
         {
           /*This functions sends error message to ble app*/
           send_err(0,position_eror);
           pause_game_flag = true ;
           //move_case = start_move;
-          for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++) 
+          for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++)
           {
               change_array[change][0] = INIT_CHANGE_VALUE;
               change_array[change][1] = INIT_CHANGE_VALUE;
@@ -1465,7 +1527,7 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
 int read_adc(_Bool *val)
 {
     int temp;
-    static uint8_t x_val,y_val; 
+    static uint8_t x_val,y_val;
     ret_code_t err_code;
     nrf_gpio_pin_clear(TP6);
     nrf_gpio_pin_set(TP2);
@@ -1493,25 +1555,25 @@ int read_adc(_Bool *val)
 //    {
 //       nrf_gpio_pin_set(TP6);
 //    }
-    if (ADC_result[0] < THRESHOLD) // AN2 chanel X 
+    if (ADC_result[0] < THRESHOLD) // AN2 chanel X
         val[0] = true;
-    else 
+    else
         val[0] = false;
-      
+
 
     if (ADC_result[1] < THRESHOLD)//AN0 chanel Y
         val[1] = true;
-    else 
-        val[1] = false;  
-  
+    else
+        val[1] = false;
+
     //sampling_flag = false;
     //--------------- Debug only ----------------------//
 //    x_val = ADC_result[0]>>2;
-//    app_uart_put(x_val); 
-//    nrf_delay_ms(1); 
+//    app_uart_put(x_val);
+//    nrf_delay_ms(1);
 //    y_val = ADC_result[1]>>2;
 //    nrf_delay_ms(1);
-//    app_uart_put(y_val); 
+//    app_uart_put(y_val);
 
     //--------------- Debug only ----------------------//
    return 0;
@@ -1519,9 +1581,26 @@ int read_adc(_Bool *val)
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
 //---------------------------------------------------------------------- move_algo -------------------------------------------------------------------//
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
-int move_algo(uint8_t change_val, _Bool reset) 
+
+
+/**
+ * @brief This function will check if the move is legal.
+ * It holds state machine which check every stet during the move,
+ * and checks for castling operation.
+ *
+ * @param[in] change_val [number of change][0->change_location; 1-> debounce counter]
+ * @param[in] reset will set the move to start_move and clear **type_and_place[3][2]** array
+          global_index = flag_castling + move_case;
+ * @attention global_index is just dummy variable (with no real purpose) for debugger not to ignore code sections.
+ *
+ *
+ * @return 1 if success and 0 if falt move
+ */
+int move_algo(uint8_t change_val, _Bool reset)
 {
+  /* type_and_place[index 0: piece removed; index 1: piece added][index 0:place; index 1: type] */
   volatile static uint8_t type_and_place[3][2];
+
   volatile static uint8_t place;
   volatile static uint8_t piece_type;
 
@@ -1531,75 +1610,101 @@ int move_algo(uint8_t change_val, _Bool reset)
     move_case = start_move;
     for (int i=0; i<3; i++)
       for (int j=0; j<2; j++)
-        type_and_place[i][j] = 0;    
+        type_and_place[i][j] = 0;
   }
 
-  place = ((change_val & 0x70) >> 1) + (change_val & 0x07); //0-63 posision and type
+  /* 0-63 posision and type*/
+  place = ((change_val & 0x70) >> 1) + (change_val & 0x07);
+
+  /* Get piece type.*/
   piece_type = current_state_board[place];
+
+  /* In case error will happen. */
   position_eror = place;
+
   //reset_timer_EOM = True; // reset the counter for END of move
+
   switch (move_case)
   {
     case start_move://----------------------------------------------------------------------------------------------//
       type_and_place[0][0] = place;      //
       type_and_place[0][1] = piece_type; //
       flag_castling = false;
-      if ((change_val < 0x79)&&(piece_type!=0))             // remove piece
+
+      /* MSB of change_val is the operation type and don't remove empty cell
+         at first piece should be removed from the cell (That's how chess pieces move across the board) */
+      if ((change_val < 0x79)&&(piece_type!=0)) /* if Remove piece */
       {
-        
-        if ((white_turn)&&(piece_type > 0x10)) 
+        /* See macros at top of the file for piece_type number.
+        *  Above 0x10 are whites, below, blacks */
+        if ((white_turn)&&(piece_type > 0x10))
         {
+          /* Check for Castling */
           if ((piece_type == KING_W) && (place == 0x04) &&
-              (((current_state[0] & 0x1F) == 0x11) || ((current_state[0] & 0xF0) == 0x90) )) // check for Castling
+              (((current_state[0] & 0x1F) == 0x11) || ((current_state[0] & 0xF0) == 0x90) ))
             flag_castling = true;
-          
+
           move_case = move_phase_1;
           DEBOUNCE_VAL = DEBOUNCE_VAL_fast;
-          global_index = flag_castling + move_case;
-          current_state_board[place] = 0;
-        } 
-        else if ((!white_turn)&&(piece_type < 0x10)) 
-        {
-          if ((piece_type == KING_B) && (place == 0x3C)&&
-              (((current_state[7] & 0x1F) == 0x11) || ((current_state[7] & 0xF0) == 0x90) )) // check for Castling) // check for Castling
-            flag_castling = true;
-          move_case = move_phase_1;
-          DEBOUNCE_VAL = DEBOUNCE_VAL_fast;
-          global_index = move_case;
+          global_index = flag_castling + move_case;//dummy variable
           current_state_board[place] = 0;
         }
+        else if ((!white_turn)&&(piece_type < 0x10)) /*Same as white case*/
+        {
+          /* Check for Castling */
+          if ((piece_type == KING_B) && (place == 0x3C)&&
+              (((current_state[7] & 0x1F) == 0x11) || ((current_state[7] & 0xF0) == 0x90) ))  
+            flag_castling = true;
+  
+          move_case = move_phase_1;
+          DEBOUNCE_VAL = DEBOUNCE_VAL_fast;
+          global_index = move_case;//dummy variable
+          current_state_board[place] = 0;
+        }
+        /*If player on his turn move opponent's piece*/
         else if (type_and_place[1][0] == place)
         {
           move_case = end_move_phase_1;
         }
-        else 
+        else
           return 0;
       }
     break;
 
-    case move_phase_1:     // place piece / Castling/ capture//------------------------------------------------------//
-      if ((change_val > 0x79)&&(piece_type==0)) // part is placed in new position
-      { 
-        current_state_board[place] = type_and_place[0][1]; // update current_state_board with the part type
-        if (flag_castling)                      //Castling
+    /* Check Place piece / Castling/ Capture*/
+    case move_phase_1:     //----------------------------------------------------------------------------------------//
+      /* Part is placed in new position*/
+      if ((change_val > 0x79) && (piece_type == 0))
+      {
+        /* Update current_state_board with the part type. type_and_place was set in start_move state.*/
+        current_state_board[place] = type_and_place[0][1];
+
+        /* If suspect Castling */
+        if (flag_castling)
         {
-          DEBOUNCE_VAL = DEBOUNCE_VAL_slow;         
-          if (white_turn) 
+          DEBOUNCE_VAL = DEBOUNCE_VAL_slow;
+          if (white_turn)
           {
+            /*If white king moved to one of final and possible castling positions */
             if ((place == 0x02) || (place == 0x06))
             {
+              /*Castling move for sure*/
               move_case = castling_phase_2;
-              global_index =move_case;
+              global_index = move_case;
             }
-            else 
+            else
             {
-              if ((place == 0x03) || (place == 0x05)) 
+               /* If white king moved to one position on the way to castling.
+                  At this point sure if it is castling or regulat move. */
+              if ((place == 0x03) || (place == 0x05))
               {
+                /* "castling-suspicious" phase */
                 move_case = castling_phase_1;
-                global_index =move_case;
+                global_index = move_case;
                 Flag_EOM_timer = true;
-              } 
-              else 
+              }
+              /* If the king didn't move to any of the "castling-suspicious' places, switch player */
+              else
               {
                 white_turn = false;
                 flag_castling = false;
@@ -1607,21 +1712,24 @@ int move_algo(uint8_t change_val, _Bool reset)
                 //send_board(); //SEND BLE ARREY cmd 0X04 end of move
               }
             }
-          } 
-          else 
+          }
+          /* The same process with black player (just different cells on the board) */
+          else
           {
-            if ((place == 0x3A) || (place == 0x3E)) 
+            if ((place == 0x3A) || (place == 0x3E))
             {
+              /*Castling move for sure*/
               move_case = castling_phase_2;
               global_index =move_case;
-            } 
-            else if ((place == 0x3B) || (place == 0x3D)) 
+            }
+            else if ((place == 0x3B) || (place == 0x3D))
             {
+              /* "castling-suspicious" phase */
               move_case = castling_phase_1;
               Flag_EOM_timer = true;
               global_index =move_case;
-            } 
-            else 
+            }
+            else
             {
               white_turn = true;
               flag_castling = false;
@@ -1629,118 +1737,148 @@ int move_algo(uint8_t change_val, _Bool reset)
               //send_board(); //SEND BLE ARREY cmd 0X03 end of move
             }
           }
-        } 
-        else //place piece
+        }
+        /*No castling(King didn't move), place piece*/
+        else
         {
-          // -------------PAWN to QUEEN------//
-          move_case = move_phase_2;///??
-          DEBOUNCE_VAL = DEBOUNCE_VAL_fast; 
+          // ------------- Transition of PAWN to QUEEN Shoud be checked (Not implemented)--------//
+
+          // ------------------------------------------------------------------------------------//
+
+          /* The piece was added */
+          move_case = move_phase_2;///
+          DEBOUNCE_VAL = DEBOUNCE_VAL_fast;
           flag_castling = false;
           Flag_EOM_timer = true; // if timer is up SEND BLE ARREY cmd 0X03 end of move
         }
-      } 
-      else if ((change_val < 0x79)&&(piece_type!=0)) // another part was lifted
+      }
+      /* Another part was lifted - Capture or castling */
+      else if ((change_val < 0x79) && (piece_type!=0))
       {
-        DEBOUNCE_VAL = DEBOUNCE_VAL_slow; 
-        if (white_turn) 
+        DEBOUNCE_VAL = DEBOUNCE_VAL_slow;
+        if (white_turn)
         {
-          if ((piece_type < 0x10)) // black is lifted
+          /* White turn & black is lifted -> capture phase */
+          if ((piece_type < 0x10))
           {
             move_case = capture_phase;
             flag_castling = false;
-          } 
+          }
+          /* White turn & white ROOK is lifted -> castling phase */
           else if ((flag_castling) && (piece_type == ROOK_W))
           {
-            move_case = castling_phase_2; 
-            global_index =move_case;
-          }                        
-          else 
-          {
-            current_state_board[type_and_place[0][0]] = type_and_place[0][1];  //
-            return 0;
-          } 
-          current_state_board[place] = 0;     
-        }
-        else 
-        {
-          if (piece_type > 0x10) // white is lifted
-          {
-            move_case = capture_phase;
-            flag_castling = false;
-          } 
-          else if (flag_castling && (piece_type == ROOK_B))
-          {
+            /* Castling move for sure */
             move_case = castling_phase_2;
             global_index =move_case;
           }
-          else 
+
+          /* White turn & Lifted Black piece &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
+          else
+          {
+            /* Set the removed piece type to the position in current_state_board
+             * type_and_place[0][0]: place of removed piece
+             * type_and_place[0][1]: type of the removed piece
+             */
+            current_state_board[type_and_place[0][0]] = type_and_place[0][1];
+            return 0;
+          }
+          current_state_board[place] = 0; // clear the place of the lifted piece
+        }
+        /* Black turn - same process as the white */
+        else
+        {
+          /* Black turn & white is lifted*/
+          if (piece_type > 0x10)
+          {
+            move_case = capture_phase;
+            flag_castling = false;
+          }
+          /* Black turn & Black ROOK is lifted -> castling phase */
+          else if (flag_castling && (piece_type == ROOK_B))
+          {
+            /*Castling move for sure*/
+            move_case = castling_phase_2;
+            global_index =move_case;
+          }
+          else
           {
             current_state_board[type_and_place[0][0]] = type_and_place[0][1];  //
             return 0;
           }
-          current_state_board[place] = 0;   
+          current_state_board[place] = 0;  // clear the place of the lifted piece
         }
       }
+      /*type_and_place[2][x] - for debugging, not really used*/
       if (flag_castling) 
       {
         type_and_place[2][0] = place;
         type_and_place[2][1] = piece_type;
-      } 
-      else 
+      }
+      else
       {
         type_and_place[1][0] = place;
         type_and_place[1][1] = piece_type;
       }
       break;
 
-    case move_phase_2: //----------------------------------------------------------------------------------------------//     
-      EOM_counter =0;
-      DEBOUNCE_VAL = DEBOUNCE_VAL_slow; 
-      if ((change_val < 0x79)&&(piece_type!=0)) // another part was lifted
+    case move_phase_2: //----------------------------------------------------------------------------------------------//
+      EOM_counter = 0;
+      DEBOUNCE_VAL = DEBOUNCE_VAL_slow;
+      /* Piece was lifted */
+      if ((change_val < 0x79)&&(piece_type!=0))
       {
-        if (white_turn) 
+        if (white_turn)
         {
-          if ((piece_type < 0x10)) // black is lifted 
-          {
-            move_case = capture_phase;
-          }                     
-          else if (place == type_and_place[1][0]) // the same part continue the move
-          {
-              move_case = move_phase_1;
-              Flag_EOM_timer = false; 
-              type_and_place[0][0] = place;
-              type_and_place[0][1] = piece_type;
-          } 
-          else             
-            return 0;     
-        }
-        else 
-        {
-          if (piece_type > 0x10) // white is lifted
+          /*Black is lifted and white turn -> capture phase*/
+          if ((piece_type < 0x10)) //
           {
             move_case = capture_phase;
           }
-          else if (place == type_and_place[1][0]) // the same part continue the move
+          /*The same part continue the move*/
+          else if (place == type_and_place[1][0])
           {
               move_case = move_phase_1;
-              Flag_EOM_timer = false; 
+              Flag_EOM_timer = false;
+              type_and_place[0][0] = place;
+              type_and_place[0][1] = piece_type;
+          }
+          else// if another part is moved before end of move -> error
+            return 0;
+        }
+        else
+        {
+           /* White is lifted and Black turn -> capture phase */
+          if (piece_type > 0x10)
+          {
+            move_case = capture_phase;
+          }
+          /* The same part continue the move */
+          else if (place == type_and_place[1][0])
+          {
+              move_case = move_phase_1;
+              Flag_EOM_timer = false;
               type_and_place[0][0] == place;
               type_and_place[0][1] == piece_type;
-          } 
-          else            
+          }
+          else// if another part is moved before end of move -> error
             return 0;
-        } 
-        current_state_board[place] = 0;
-      } 
-      else            
-        return 0;  
+        }
+        current_state_board[place] = 0;// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&??
+      }
+      else
+        return 0; //if Another piece was added - this is error
     break;
 
     case capture_phase://----------------------------------------------------------------------------------------------//
+        /* If putting a piece in the same place as the removed opponent piece,
+         * finish the move,update the board & go to start_move.
+         * There is no rule check it the move was legal.
+         */
         if ((change_val > 0x79)&&(piece_type==0)
-            &&(place == type_and_place[1][0])) 
+            &&(place == type_and_place[1][0]))
         {
-          // -------------PAWN to QUEEN------//
+          // -------------PAWN to QUEEN(Not implemented)------//
+          // -------------------------------------------------//
 
           current_state_board[place] = type_and_place[0][1]; // update current_state_board with the part type
           move_case = start_move;
@@ -1754,45 +1892,49 @@ int move_algo(uint8_t change_val, _Bool reset)
      break;
 
      case castling_phase_1://----------------------------------------------------------------------------------------------//
-        
-      if ((change_val < 0x79)&&(piece_type!=0)) // king or castel  are lifted
+      /*
+       * First time king moved in move_phase_1 and If king or casle moved another time it castling for sure
+       * -> go to castling_phase_2
+       */
+      if ((change_val < 0x79)&&(piece_type!=0)) // king or castel are lifted
       {
-        if (white_turn) 
+        if (white_turn)
         {
           if ((piece_type == ROOK_W)||(piece_type == KING_W))
           {
             move_case = castling_phase_2;
-            Flag_EOM_timer = false; 
+            Flag_EOM_timer = false;
             current_state_board[place] = 0;
           }
           else
-            return 0;
-        } 
+            return 0; // moved opponent's piece -> error
+        }
         else if ((piece_type == ROOK_B)||(piece_type == KING_B))
         {
           move_case = castling_phase_2;
-          Flag_EOM_timer = false; 
+          Flag_EOM_timer = false;
           current_state_board[place] = 0;
-        } 
-        else 
-          return 0;
+        }
+        else
+          return 0;// moved opponent's piece -> error
       }
     break;
 
     case castling_phase_2:
-      if ((change_val > 0x7F)&&(piece_type==0)) 
+      /*If piece was added*/
+      if ((change_val > 0x7F)&&(piece_type==0))
       {
-        if (white_turn) 
+        if (white_turn)
         {
-          if ((place == 0x02) || (place == 0x06)) 
+          if ((place == 0x02) || (place == 0x06))
           {
             current_state_board[place] = KING_W; // update current_state_board with the part type
-          } 
-          else if ((place == 0x03) || (place == 0x05)) 
+          }
+          else if ((place == 0x03) || (place == 0x05))
           {
             current_state_board[place] = ROOK_W; // update current_state_board with the part type
           }
-          
+          /*Check if the position after castling of White is OK-> finish the move.*/
           if ((((new_state[0] & 0xF0) == 0x60) && (current_state_board[0x06] == KING_W))||
               (((new_state[0] & 0x0F) == 0x0C) && (current_state_board[0x02] == KING_W))  )
           {
@@ -1800,32 +1942,33 @@ int move_algo(uint8_t change_val, _Bool reset)
             global_index =move_case;
             flag_castling = false;
             //send_board();                 //SEND BLE ARREY cmd 0X03 end of move
-            Flag_EOM_timer = false;       // clear flag 
+            Flag_EOM_timer = false;       // clear flag
             EOM_counter = 0;
             white_turn = false;
             type_and_place[1][0] = place;
             type_and_place[1][1] = piece_type;
             send_end_of_move(white_turn);
           }
-        } 
-        else 
+        }
+        else
         {
-          if ((place == 0x3A) || (place == 0x3E)) 
+          if ((place == 0x3A) || (place == 0x3E))
           {
             current_state_board[place] = KING_B; // update current_state_board with the part type
-          } 
-          else if ((place == 0x3B) || (place == 0x3D)) 
+          }
+          else if ((place == 0x3B) || (place == 0x3D))
           {
             current_state_board[place] = ROOK_B; // update current_state_board with the part type
           }
+          /*Check if the position after castling of Black is OK-> finish the move.*/
           if ((((new_state[7] & 0xF0) == 0x60) && (current_state_board[0x3E] == KING_B ))||
               (((new_state[7] & 0x0F) == 0x0C) && (current_state_board[0x3A] == KING_B))   )
           {
             move_case = start_move;
-            global_index =move_case; 
+            global_index =move_case;
             flag_castling = false;
             //send_board();                 //SEND BLE ARREY cmd 0X03 end of move
-            Flag_EOM_timer = false;       // clear flag 
+            Flag_EOM_timer = false;       // clear flag
             white_turn = true;
             type_and_place[1][0] = place;
             type_and_place[1][1] = piece_type;
@@ -1833,20 +1976,22 @@ int move_algo(uint8_t change_val, _Bool reset)
           }
         }
       }
+      /*If king or rook was lifted -> clear the place &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& */
       else if ((change_val < 0x7F)&&((piece_type==ROOK_B)||(piece_type==ROOK_W)||(piece_type==KING_B)||(piece_type==KING_W)))
       {
          current_state_board[place] =0;
       }
-      else 
+      else
         return 0;
 
       break;
 
       case end_move_phase_1:
+      /*If lifted opponent's piece */
         if(change_val > 0x7F)
         {
           move_case = start_move;
-          if (type_and_place[0][0] != place) 
+          if (type_and_place[0][0] != place)
             return 0;
         }
         else
@@ -1861,12 +2006,17 @@ int move_algo(uint8_t change_val, _Bool reset)
   return 1;
 }
 
-
-/**@brief Application main function.
- */
  //----------------------------------------------------------------------------------------------------------------------------------------------------//
 //------------------------------------------------------------------------------- Main ----------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Application Main function
+ * This function has the main loop of the application
+ * Commands from the Android app are parsed and the appropriate function are called
+ * @note pause_game_flag whick indicates if error occured is been checked
+ *
+ * @return int
+ */
 int main(void)
 {
     bool erase_bonds;
@@ -1877,7 +2027,7 @@ int main(void)
     uint8_t ind;
     uint8_t a, b;
     a = 1;
-   
+
     init_dcb();
     uart_init();
     log_init();
@@ -1892,132 +2042,154 @@ int main(void)
       services_init();
       advertising_init();
       conn_params_init();
-      advertising_start(); 
-    #endif      
-    saadc_init();    
+      advertising_start();
+    #endif
+    saadc_init();
     uint8_t cs_ret;
 
-   
-    for(int i = 0; i<data_packet[2]; i++)
-            data_packet[i] = 0xFF;
+  for(int i = 0; i<data_packet[2]; i++)
+          data_packet[i] = 0xFF;
 // Enter main loop.
     for (;;)
-    {       
+    {
         //nrf_pwr_mgmt_run();
+
+        /*Check if data from Android recieved and the header(data_packet[0]) is correct*/
         if ((recieved_data_flag == true) && (data_packet[0] == header))
         {
           cs_ret = data_packet_cs();
           if (!data_packet_cs())
           {
+              //Set flags to call appropriate functions according to the data from Android data_packet[1]
               switch (data_packet[1])
               {
-                case ping_from_android:                   
-                  send_ack(data_packet[1], true);  
+                case ping_from_android:
+                  send_ack(data_packet[1], true);
                 break;
-              
+
                 case init_state:
 //                  for (int i=0; i < 64 ; i++)
 //                  {
-//                    board_state_array[i] = data_packet[i+3]; 
+//                    board_state_array[i] = data_packet[i+3];
 //                  }
-                    send_ack(data_packet[1], true);                    
-                break;   
-               
-                case start_of_game:                
-                  start_of_game_flag = true;   
-                  SOG_update_flag = true;  
-                  pause_game_flag = false;                                
-                  send_ack(data_packet[1], true); 
-                break;      
-              
-                case end_of_game:    
-                  start_of_game_flag = false;
-                  send_ack(data_packet[1], true);  
-                break; 
+                    send_ack(data_packet[1], true);
+                break;
 
-                case resume_game:    
-                  pause_game_flag = false; 
-                  send_ack(data_packet[1], true);  
-                break; 
+                case start_of_game:
+                  start_of_game_flag = true;
+                  SOG_update_flag = true;
+                  pause_game_flag = false;
+                  send_ack(data_packet[1], true);
+                break;
+
+                case end_of_game:
+                  start_of_game_flag = false;
+                  send_ack(data_packet[1], true);
+                break;
+
+                case resume_game:
+                  pause_game_flag = false;
+                  send_ack(data_packet[1], true);
+                break;
               }
               recieved_data_flag = false;
           }
             size_of_packet= data_packet[2] + 4;
             for(int i = 0; i<size_of_packet  ; i++)
-            {                         
-                 data_packet[i] = 0x00;      
-            }       
-        
+            {
+                 data_packet[i] = 0x00;
+            }
+
         }
 
    #ifndef Debug_off_BLE_on
     start_of_game_flag = true;  //----------------------------------for debugging------------------------------------------ //
-   #endif 
+   #endif
 
       if (start_of_game_flag == true)
       {
+        /*This is to enter here only once*/
         if (SOG_update_flag)
         {
           SOG_update_flag = false;
+
           for (uint8_t i=0; i<8; i++)
             for (uint8_t j=0; j<2; j++)
               change_array[i][j] = INIT_CHANGE_VALUE;
           line_val =0xFF;
-          for ( ind=0; ind < 64 ; ind++) // - update the current_state array
+
+          /* Update the current_state array */
+          for ( ind=0; ind < 64 ; ind++)
           {
+            /* Set the current_state_board with inital board state*/
             current_state_board[ind]=board_state_array[ind];
-            if (board_state_array[ind]==0x00) 
-              line_val = line_val & NBIT(ind % BITS_IN_BYTE);  // clear bit      
-            if(((ind+1) % BITS_IN_BYTE) == 0) 
+
+            /* Init the current_state[8] array, holds the
+             * occupied cells in the board. Every bit is one cell*/
+            if (board_state_array[ind]==0x00)
+              line_val = line_val & NBIT(ind % BITS_IN_BYTE);  // clear bit
+            if(((ind+1) % BITS_IN_BYTE) == 0)
             {
               current_state[((ind+1) / BITS_IN_BYTE)-1] = line_val;
               line_val =0xFF;
-            }  
+            }
           }
+
+          /*White is first to move*/
           white_turn = true;
           move_case = start_move;
         }
+        /* If there is no error, continue to operate*/
         if(!pause_game_flag)
         {
+          /*Read board and set the new_state[8] array.*/
           read_board_position();
+
           // for(uint8_t i = 0; i<8; i++)
-          //   app_uart_put(0xa0+i);  
+          //   app_uart_put(0xa0+i);
           //for(uint8_t i = 0; i<8; i++)
-          //  app_uart_put(current_state[i]);  
-          //app_uart_put(0xff);      
-          nrf_delay_us(500);       
+          //  app_uart_put(current_state[i]);
+          //app_uart_put(0xff);
+          nrf_delay_us(500);
+
+          /*This function will compare new_state[8] with current_state[8]*/
           compare_block();
+
           if (Flag_EOM_timer)
           {
             nrf_gpio_pin_set(TP1);
             ++EOM_counter;
-            if (EOM_counter>EOM_THRESHOLD)
+
+            /* EOM_counter act as timer to finish the move,
+             * when reaches EOM_THRESHOLD-> swich move
+             */
+            if (EOM_counter > EOM_THRESHOLD)
             {
               EOM_counter =0;
               Flag_EOM_timer = false;
               flag_castling = false;
               move_case = start_move;
               DEBOUNCE_VAL = DEBOUNCE_VAL_slow;
-              white_turn=!white_turn;
-              send_end_of_move(white_turn);
+              white_turn=!white_turn; /*Change player*/
+              send_end_of_move(white_turn); /*send to android*/
               nrf_gpio_pin_clear(TP1);
             }
-          } 
-          else 
+          }
+          else
             EOM_counter =0;
         }
 
         /*If pause_game_flag is true that means error occured->
           read the board position and compare it with  */
-        else 
+        else
         {
-          
-        
-        
+
+
+
         }
-        
+
       }
-      //idle_state_handle();   
+      //idle_state_handle();
     }
 }
 

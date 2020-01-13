@@ -1,0 +1,19 @@
+var searchData=
+[
+  ['bishop_5fb_17',['BISHOP_B',['../main_8c.html#ad0f100be9373bb70fa2b87b45720e19d',1,'main.c']]],
+  ['bishop_5fw_18',['BISHOP_W',['../main_8c.html#ad12754147c497560b799370c5b6c8f2e',1,'main.c']]],
+  ['bit_19',['BIT',['../main_8c.html#a3a8ea58898cb58fc96013383d39f482c',1,'main.c']]],
+  ['bits_5fin_5fbyte_20',['BITS_IN_BYTE',['../main_8c.html#ac54bd5b32c8baefaf13608a9296a7564',1,'main.c']]],
+  ['ble_5fadvertising_5fdef_21',['BLE_ADVERTISING_DEF',['../main_8c.html#aed8448996f9ccf807c629fdb8fff5f89',1,'main.c']]],
+  ['ble_5fevt_5fhandler_22',['ble_evt_handler',['../main_8c.html#af79fad11603ce86f991e529e023dc564',1,'main.c']]],
+  ['ble_5fnus_5fdef_23',['BLE_NUS_DEF',['../main_8c.html#a83b7e8c5c5e0ae26cac183f60b3f6f99',1,'main.c']]],
+  ['ble_5fstack_5finit_24',['ble_stack_init',['../main_8c.html#aa06a7a39e83ec4cf3553f4ed6ba6323a',1,'main.c']]],
+  ['block_5faddr0_25',['BLOCK_ADDR0',['../main_8c.html#ad49e90b29bea3fed03c315587fbba975',1,'main.c']]],
+  ['block_5faddr1_26',['BLOCK_ADDR1',['../main_8c.html#a68ef474f10af081d2d03fb8caaeec124',1,'main.c']]],
+  ['block_5faddr2_27',['BLOCK_ADDR2',['../main_8c.html#afe6944fe470c3acb3e9954aa3bfb2665',1,'main.c']]],
+  ['block_5fnum_28',['BLOCK_NUM',['../main_8c.html#a8d2adb354b7c1e29d95fd27c8203a3fd',1,'main.c']]],
+  ['board_5flookup_29',['board_lookup',['../main_8c.html#ad156fbd7753c7412108b0c7626583c65',1,'main.c']]],
+  ['board_5fstate_5farray_30',['board_state_array',['../main_8c.html#a68fa04e9b03e971ca2127c6d99ce116c',1,'main.c']]],
+  ['bsp_5fevent_5fhandler_31',['bsp_event_handler',['../main_8c.html#a22ac6b4aa31eb37eb73d3f2a4983a121',1,'main.c']]],
+  ['buttons_5fleds_5finit_32',['buttons_leds_init',['../main_8c.html#ada967b353ba42e8061e8fdb343bf74e7',1,'main.c']]]
+];
