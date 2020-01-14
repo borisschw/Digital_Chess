@@ -210,8 +210,10 @@ static int enable_pd_block(uint8_t block_num);
 static int read_block();
 static int read_board_position();
 static int compare_block();//(uint8_t *current_state, uint8_t *new_state);
+int compare_arrays(uint8_t a[],uint8_t b[],uint8_t size);
 
 static int send_board(void);
+static int send_recovery_board(void);
 
 
 static uint16_t   m_conn_handle          = BLE_CONN_HANDLE_INVALID;                 /**< Handle of the current connection. */
@@ -237,27 +239,30 @@ static uint32_t                m_adc_evt_counter = 0;
 static bool                    m_saadc_calibrate = false;
 
 
-/*-- Global Variables--*/
+/*------ Global Variables--------*/
 /**
  * change array [change number][0:type of change; 1:number of times the change is persistant]
  */
 volatile uint8_t change_array[MAX_NUMBER_OF_CHANGES][2];
 
-
-uint8_t current_position[8];
-
+/*This array updated on every player switch
+and saves the current_position*/
+uint8_t recovery_current_state[8];
 /**
  * Holds the current board state every bit is place on the board
- * */
+ */
 volatile uint8_t current_state[8];
-
+volatile uint8_t current_state[8];
 uint8_t new_state[8];// Holds the new board state
 
- /**
-  * Holds the current board state with the figures names,
+ /** Holds the current board state with the figures names,
   * each byte is figure description
   */
 volatile uint8_t current_state_board[64] = {0};
+/**This array updated on every player switch
+ * and saves the current_state_board*/
+volatile uint8_t recovery_current_state_board[64] = {0};
+
 
 volatile int global_index;
 volatile int odd_array[32];
@@ -269,6 +274,8 @@ volatile uint8_t move_case;
 volatile uint8_t position_eror;
 volatile uint8_t DEBOUNCE_VAL;
 volatile uint8_t pause_game_flag;
+
+volatile uint8_t line_debug; 
 //volatile bool sampling_flag = false;
 
 
@@ -284,6 +291,12 @@ volatile _Bool Flag_EOM_timer = false;
 volatile _Bool start_of_game_flag = false;
 volatile _Bool SOG_update_flag = true;
 volatile _Bool flag_castling;
+
+/*Indicated that end of move command should be sent*/
+volatile _Bool send_EOM_flag = false;
+
+
+
 volatile uint16_t EOM_counter = 0;
 
 /**
@@ -1026,14 +1039,38 @@ uint32_t send_ack(uint8_t command, _Bool ACK)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //----------------------------------------------------------------------send_end_of_move-------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Sending end of move command to the App and saving the position to the recovery arrays.
+ * @param recovery_current_state is the array that hold the current_position at the end of move. In case of fault move recover from it.
+ * @param recovery_current_state_board is the array that hold the current_state_board at the end of move. In case of fault move recover from it.
+ * @param white indicated the player that finish the move.
+ */
 void send_end_of_move(_Bool white)
 {
   uint8_t data_to_send1[5] = {0};
   uint16_t length;
   uint8_t checksum = 0;
+  uint8_t index =0;
+
+  /*Save current state to recovery memory*/
+  for (index = 0 ; index < 8 ; index++)
+  {
+    recovery_current_state[index] = current_state [index];
+  }
+
+  for (index = 0 ; index < 64 ; index++)
+  {
+    recovery_current_state_board[index] = current_state_board [index];
+  }
+
+
+//  memcpy(recovery_current_state, current_position,sizeof(current_position));
+//  memcpy(recovery_current_state_board, current_state_board,sizeof(current_state_board));
+
   data_to_send1[0] = 0xAA;
   data_to_send1[1] = 0x04;
   data_to_send1[2] = 0x01;
+
   if (white)
     data_to_send1[3] = 0x10;
   else
@@ -1050,6 +1087,28 @@ void send_end_of_move(_Bool white)
 ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle);
 
 }
+
+/**
+ * @brief Compares 2 arrays
+ *
+ * @param a
+ * @param b
+ * @param size
+ * @return int
+ */
+int compare_arrays(uint8_t a[],uint8_t b[],uint8_t size)
+{
+  uint8_t index = 0;
+  for(index = 0; index < size; index++)
+  {
+      if (a[index] != b[index])
+        return 0;
+  }
+  return 1;
+}
+
+
+
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------send_board------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -1081,6 +1140,38 @@ int send_board(void)
 
 }
 
+
+
+//---------------------------------------------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------send_recovery_board------------------------------------------------------------------//
+//---------------------------------------------------------------------------------------------------------------------------------------------------//
+int send_recovery_board(void)
+{
+    uint8_t data_to_send1[68] = {0};
+    uint16_t length;
+    uint8_t checksum = 0;
+   // int i;
+
+    data_to_send1[0] = 0xAA;
+    data_to_send1[1] = 0x03;
+    data_to_send1[2] = 0x40;
+
+    for (int i = 0; i < 64; i++ )
+    {
+      data_to_send1[i + 3] = recovery_current_state_board[i];
+      //data_to_send1[i + 3] =board_state_array1[i];
+    }
+
+    for (int i = 0 ; i < 67 ; i++)
+    {
+       checksum += data_to_send1[i];
+    }
+    data_to_send1[67] = checksum;
+    length = 68;
+
+    ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle);
+
+}
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------send_current_position-------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -1097,7 +1188,7 @@ int send_current_position(void)
 
     for (int i = 0; i < 8; i++ )
     {
-      data_to_send1[i + 3] = current_position[i];
+      data_to_send1[i + 3] = current_state[i];
     }
 
     for (int i = 0 ; i < 11 ; i++)
@@ -1170,9 +1261,7 @@ int init_dcb()
   nrf_gpio_cfg_output(TP7);
   read_board_position();
 
-  for(i = 0; i < NUM_OF_CELLS / 8; i++)
-    current_position[i] = 0;
-
+  
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
@@ -1313,7 +1402,7 @@ int set_block(uint8_t block_num)
 /**
  * @brief Read the board position to new_state[8].
  * It sets the Muxes and buffers gpio
- *
+ * @warning Problem with function, whene reading once
  * @return int
  */
 int read_board_position(void)
@@ -1393,11 +1482,10 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
   volatile uint8_t new_bit;
 
   /* Change_location:
-   * Bit       7         |6    |5    |4     |3     |2    |1    |0
-   * meaning : add/remove|line2|line1|line90|------|col2 |col1 |col0
+   * Bit       7         |6    |5    |4    |3     |2    |1    |0
+   * meaning : add/remove|line2|line1|line0|------|col2 |col1 |col0
   */
   volatile static uint8_t change_location;
-
 
   volatile static uint8_t change;
   volatile static _Bool flag_new_change;
@@ -1485,7 +1573,7 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
         */
         ret_update = move_algo(change_array[change][0] ,false);
 
-        if (ret_update == 1)
+        if (ret_update == 1) /*legal move*/
         {
           line   = (change_array[change][0]>>4) & 0x07;
           column = change_array[change][0] & 0x07;
@@ -1498,14 +1586,31 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
           else /*piece was removed*/
             current_state[line]= current_state[line] & NBIT(column);
 
+          if (send_EOM_flag )
+          {
+            send_EOM_flag = false;
+            send_end_of_move(white_turn);
+          }
+
           change_array[change][0] = INIT_CHANGE_VALUE;
           change_array[change][1] = INIT_CHANGE_VALUE;
           //send_current_position();
+          send_board();
         }
         else if (ret_update==0) /*Illigal move*/
         {
-          /*This functions sends error message to ble app*/
+          /* Send recovery board*/
+          send_recovery_board();
+          
+          nrf_delay_ms(10);
+
+          /* This functions sends error message to ble app*/
           send_err(0,position_eror);
+
+          /*Clear the state machine and flags as it will act as new move*/
+          Flag_EOM_timer = false;
+          flag_castling = false;
+          move_case = start_move;
           pause_game_flag = true ;
           //move_case = start_move;
           for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++)
@@ -1653,15 +1758,17 @@ int move_algo(uint8_t change_val, _Bool reset)
         {
           /* Check for Castling */
           if ((piece_type == KING_B) && (place == 0x3C)&&
-              (((current_state[7] & 0x1F) == 0x11) || ((current_state[7] & 0xF0) == 0x90) ))  
+              (((current_state[7] & 0x1F) == 0x11) || ((current_state[7] & 0xF0) == 0x90) ))
             flag_castling = true;
-  
+
           move_case = move_phase_1;
           DEBOUNCE_VAL = DEBOUNCE_VAL_fast;
           global_index = move_case;//dummy variable
           current_state_board[place] = 0;
         }
-        /*If player on his turn move opponent's piece*/
+        /*If player on his turn move opponent's piece and it's
+        * the last piece the opponent moved
+        */
         else if (type_and_place[1][0] == place)
         {
           move_case = end_move_phase_1;
@@ -1707,6 +1814,7 @@ int move_algo(uint8_t change_val, _Bool reset)
               else
               {
                 white_turn = false;
+                /*Save state to recovery state*/
                 flag_castling = false;
                 move_case = start_move;
                 //send_board(); //SEND BLE ARREY cmd 0X04 end of move
@@ -1729,6 +1837,7 @@ int move_algo(uint8_t change_val, _Bool reset)
               Flag_EOM_timer = true;
               global_index =move_case;
             }
+            /*End of move*/
             else
             {
               white_turn = true;
@@ -1772,14 +1881,15 @@ int move_algo(uint8_t change_val, _Bool reset)
             global_index =move_case;
           }
 
-          /* White turn & Lifted Black piece &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
+          /* */
           else
           {
             /* Set the removed piece type to the position in current_state_board
              * type_and_place[0][0]: place of removed piece
              * type_and_place[0][1]: type of the removed piece
              */
-            current_state_board[type_and_place[0][0]] = type_and_place[0][1];
+
+             //current_state_board[type_and_place[0][0]] = type_and_place[0][1];
             return 0;
           }
           current_state_board[place] = 0; // clear the place of the lifted piece
@@ -1809,12 +1919,12 @@ int move_algo(uint8_t change_val, _Bool reset)
         }
       }
       /*type_and_place[2][x] - for debugging, not really used*/
-      if (flag_castling) 
+      if (flag_castling)
       {
         type_and_place[2][0] = place;
         type_and_place[2][1] = piece_type;
       }
-      else
+      else//put a piece on the board and not castling
       {
         type_and_place[1][0] = place;
         type_and_place[1][1] = piece_type;
@@ -1863,7 +1973,7 @@ int move_algo(uint8_t change_val, _Bool reset)
           else// if another part is moved before end of move -> error
             return 0;
         }
-        current_state_board[place] = 0;// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&??
+        current_state_board[place] = 0;
       }
       else
         return 0; //if Another piece was added - this is error
@@ -1887,7 +1997,9 @@ int move_algo(uint8_t change_val, _Bool reset)
           white_turn = !white_turn;
           type_and_place[1][0] = place;
           type_and_place[1][1] = type_and_place[0][1];
-          send_end_of_move(white_turn);
+
+          send_EOM_flag = true;
+          //send_end_of_move(white_turn);
         }
      break;
 
@@ -1947,7 +2059,8 @@ int move_algo(uint8_t change_val, _Bool reset)
             white_turn = false;
             type_and_place[1][0] = place;
             type_and_place[1][1] = piece_type;
-            send_end_of_move(white_turn);
+            send_EOM_flag = true;
+            //send_end_of_move(white_turn);
           }
         }
         else
@@ -1972,11 +2085,12 @@ int move_algo(uint8_t change_val, _Bool reset)
             white_turn = true;
             type_and_place[1][0] = place;
             type_and_place[1][1] = piece_type;
-            send_end_of_move(white_turn);
+            send_EOM_flag = true;
+            //send_end_of_move(white_turn);
           }
         }
       }
-      /*If king or rook was lifted -> clear the place &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& */
+      /*If king or rook was lifted -> clear the place */
       else if ((change_val < 0x7F)&&((piece_type==ROOK_B)||(piece_type==ROOK_W)||(piece_type==KING_B)||(piece_type==KING_W)))
       {
          current_state_board[place] =0;
@@ -1987,11 +2101,13 @@ int move_algo(uint8_t change_val, _Bool reset)
       break;
 
       case end_move_phase_1:
-      /*If lifted opponent's piece */
+      // This state is for debouncing of the placement of a piece
+      /*If piece was added */
         if(change_val > 0x7F)
         {
           move_case = start_move;
-          if (type_and_place[0][0] != place)
+          /*check if the piece places on the original location*/
+          if (!(type_and_place[1][0] == place))
             return 0;
         }
         else
@@ -2002,7 +2118,7 @@ int move_algo(uint8_t change_val, _Bool reset)
         move_case = start_move;
       break;
   }
-  send_board();
+//  send_board();
   return 1;
 }
 
@@ -2088,8 +2204,33 @@ int main(void)
                 break;
 
                 case resume_game:
-                  pause_game_flag = false;
+//                  send_ack(data_packet[1], true);
+//                  pause_game_flag = false;
+
+
                   send_ack(data_packet[1], true);
+                  /* Read the board before checking if the player changed
+                   * the position of the pieces back*/
+
+                  /*Pay attention!! some issue with read_board_position..
+                    with one read function it's not working*/
+                  read_board_position();                  
+                  read_board_position();
+
+                  //read_board_position();
+                  /*Compare the new board state with the recovered*/
+                  if (compare_arrays(new_state, recovery_current_state, 8)==1)
+                  {
+                    /* If the player retured the pieces*/
+                      pause_game_flag = false;
+                      Flag_EOM_timer = false;
+                  }
+                  else
+                  {
+                    /* If the positions are not equal*/
+                    pause_game_flag = true;
+                    send_err(0,position_eror);
+                  }
                 break;
               }
               recieved_data_flag = false;
@@ -2170,24 +2311,14 @@ int main(void)
               flag_castling = false;
               move_case = start_move;
               DEBOUNCE_VAL = DEBOUNCE_VAL_slow;
-              white_turn=!white_turn; /*Change player*/
+              white_turn =! white_turn; /*Change player*/
               send_end_of_move(white_turn); /*send to android*/
               nrf_gpio_pin_clear(TP1);
             }
           }
           else
             EOM_counter =0;
-        }
-
-        /*If pause_game_flag is true that means error occured->
-          read the board position and compare it with  */
-        else
-        {
-
-
-
-        }
-
+        }        
       }
       //idle_state_handle();
     }
