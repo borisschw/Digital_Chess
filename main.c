@@ -252,7 +252,7 @@ uint8_t recovery_current_state[8];
  * Holds the current board state every bit is place on the board
  */
 volatile uint8_t current_state[8];
-volatile uint8_t current_state[8];
+
 uint8_t new_state[8];// Holds the new board state
 
  /** Holds the current board state with the figures names,
@@ -1601,7 +1601,7 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
         {
           /* Send recovery board*/
           send_recovery_board();
-          
+
           nrf_delay_ms(10);
 
           /* This functions sends error message to ble app*/
@@ -1612,7 +1612,7 @@ int compare_block(void)//(uint8_t *current_state, uint8_t *new_state)
           flag_castling = false;
           move_case = start_move;
           pause_game_flag = true ;
-          //move_case = start_move;
+
           for(change = 0; change < MAX_NUMBER_OF_CHANGES; change++)
           {
               change_array[change][0] = INIT_CHANGE_VALUE;
@@ -2214,16 +2214,19 @@ int main(void)
 
                   /*Pay attention!! some issue with read_board_position..
                     with one read function it's not working*/
-                  read_board_position();                  
                   read_board_position();
-
-                  //read_board_position();
+                  read_board_position();
+                  read_board_position();
                   /*Compare the new board state with the recovered*/
                   if (compare_arrays(new_state, recovery_current_state, 8)==1)
                   {
                     /* If the player retured the pieces*/
                       pause_game_flag = false;
                       Flag_EOM_timer = false;
+                      for (int i = 0; i < 64; i++ )
+                      {                        
+                        current_state_board[i] = recovery_current_state_board[i];                        
+                      }
                   }
                   else
                   {
@@ -2264,6 +2267,7 @@ int main(void)
           {
             /* Set the current_state_board with inital board state*/
             current_state_board[ind]=board_state_array[ind];
+            recovery_current_state_board[ind] = board_state_array[ind];
 
             /* Init the current_state[8] array, holds the
              * occupied cells in the board. Every bit is one cell*/
@@ -2272,6 +2276,7 @@ int main(void)
             if(((ind+1) % BITS_IN_BYTE) == 0)
             {
               current_state[((ind+1) / BITS_IN_BYTE)-1] = line_val;
+              recovery_current_state[((ind+1) / BITS_IN_BYTE)-1] = line_val;
               line_val =0xFF;
             }
           }
