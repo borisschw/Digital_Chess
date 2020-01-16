@@ -1864,11 +1864,17 @@ int move_algo(uint8_t change_val, _Bool reset)
       }
     break;
 
-    /* Check Place piece / Castling/ Capture*/
+    /* Check Place piece / Castling / Capture*/
     case move_phase_1:     //----------------------------------------------------------------------------------------//
       /* Part is placed in new position*/
       if ((change_val > 0x79) && (piece_type == 0))
       {
+        /*If a plyer lifted a piece and placed it on the same place(the player lifted by mistake),
+        send error to APP and wait for resume - turn not changing*/
+        if (current_state_board[place] == recovery_current_state_board[place])
+        {
+          return 0;
+        }
         /* Update current_state_board with the part type. type_and_place was set in start_move state.*/
         current_state_board[place] = type_and_place[0][1];
 
