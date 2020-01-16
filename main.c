@@ -164,14 +164,18 @@
 #define EOM_THRESHOLD 100 // 150*3mSec =750msec
 
 
-
+/**
+ * @brief commands to and from Android App
+ *
+ */
 enum command_value{
+/*-------To Android----------------*/
 ping_from_dcb   = 0x01,
 mask_bit_array  = 0x02,
 full_bit_array  = 0x03,
 end_of_move     = 0x04,
 
-//---------------------
+/*-------from android--------------*/
 ping_from_android = 0x80,
 init_state        = 0x81,
 start_of_game     = 0x82,
@@ -180,6 +184,10 @@ resume_game       = 0x84,
 header            = 0xAA
 };
 
+/**
+ * @brief move_algo state number enum
+ *
+ */
 enum move_algo_case{
 start_move        =1,
 move_phase_1      =2,
@@ -190,15 +198,18 @@ castling_phase_2  =6,
 end_move_phase_1  =7,
 end_move_phase_2  =8
 };
-
-BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT);                                   /**< BLE NUS service instance. */
-NRF_BLE_GATT_DEF(m_gatt);                                                           /**< GATT module instance. */
-NRF_BLE_QWR_DEF(m_qwr);                                                             /**< Context for the Queued Write module.*/
-BLE_ADVERTISING_DEF(m_advertising);                                                /**< Advertising module instance. */
+/**< BLE NUS service instance. */
+BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT);
+/**< GATT module instance. */
+NRF_BLE_GATT_DEF(m_gatt);
+/**< Context for the Queued Write module.*/
+NRF_BLE_QWR_DEF(m_qwr);
+/**< Advertising module instance. */
+BLE_ADVERTISING_DEF(m_advertising);
 void saadc_sampling_event_init(void);
 
 
-/*--Function decalraitions--*/
+/*-------------------------------------Function decalraitions--------------------------------------------------------*/
 static void send_err(uint8_t err_type,uint8_t err_pos);
 static int set_block(uint8_t block_num);
 static int set_addr(uint8_t addr_num);
@@ -239,8 +250,10 @@ static uint32_t                m_adc_evt_counter = 0;
 static bool                    m_saadc_calibrate = false;
 
 
-/*------ Global Variables--------*/
+/*---------------------------------- Global Variables--------------------------------------------------------------*/
+
 /**
+ *
  * change array [change number][0:type of change; 1:number of times the change is persistant]
  */
 volatile uint8_t change_array[MAX_NUMBER_OF_CHANGES][2];
@@ -275,7 +288,7 @@ volatile uint8_t position_eror;
 volatile uint8_t DEBOUNCE_VAL;
 volatile uint8_t pause_game_flag;
 
-volatile uint8_t line_debug; 
+volatile uint8_t line_debug;
 //volatile bool sampling_flag = false;
 
 
@@ -687,7 +700,12 @@ static void ble_stack_init(void)
 }
 
 
-/**@brief Function for handling events from the GATT library. */
+/**
+ * @brief Function for handling events from the GATT library.
+ *
+ * @param p_gatt
+ * @param p_evt
+ */
 void gatt_evt_handler(nrf_ble_gatt_t * p_gatt, nrf_ble_gatt_evt_t const * p_evt)
 {
     if ((m_conn_handle == p_evt->conn_handle) && (p_evt->evt_id == NRF_BLE_GATT_EVT_ATT_MTU_UPDATED))
@@ -933,7 +951,11 @@ static void advertising_start(void)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //----------------------------------------------------------------------saadc_callback------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
-
+/**
+ * @brief saadc_callback
+ *
+ * @param p_event
+ */
 void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 {
     NRF_LOG_INFO("ADC event");
@@ -941,6 +963,10 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //----------------------------------------------------------------------saadc_init-------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief initiate ADC
+ *
+ */
 void saadc_init(void)
 {
     uint32_t err_code;
@@ -976,6 +1002,11 @@ void saadc_init(void)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //----------------------------------------------------------------------data_packet_cs---------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Compute data packet check sum
+ *
+ * @return uint8_t
+ */
 uint8_t data_packet_cs()//(Data_packet* data)
 {
     uint8_t i = 0;
@@ -999,6 +1030,13 @@ uint8_t data_packet_cs()//(Data_packet* data)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //----------------------------------------------------------------------send_ack---------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief send acknoladge to App
+ *
+ * @param command
+ * @param ACK
+ * @return uint32_t
+ */
 uint32_t send_ack(uint8_t command, _Bool ACK)
 {
   //data_to_send = (uint8_t*) malloc(sizeof(uint8_t) * 6);
@@ -1112,6 +1150,11 @@ int compare_arrays(uint8_t a[],uint8_t b[],uint8_t size)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------send_board------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Send the full current state of the board to the App
+ *
+ * @return int
+ */
 int send_board(void)
 {
     uint8_t data_to_send1[68] = {0};
@@ -1145,6 +1188,11 @@ int send_board(void)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------send_recovery_board------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Send the full recovery state of the board (the board at the start of the current move)
+ *
+ * @return int
+ */
 int send_recovery_board(void)
 {
     uint8_t data_to_send1[68] = {0};
@@ -1175,36 +1223,43 @@ int send_recovery_board(void)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------send_current_position-------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
-int send_current_position(void)
-{
-    uint8_t data_to_send1[12] = {0};
-    uint16_t length;
-    uint8_t checksum = 0;
-   // int i;
 
-    data_to_send1[0] = 0xAA;
-    data_to_send1[1] = 0x02;
-    data_to_send1[2] = 0x08;
+// int send_current_position(void)
+// {
+//     uint8_t data_to_send1[12] = {0};
+//     uint16_t length;
+//     uint8_t checksum = 0;
+//    // int i;
 
-    for (int i = 0; i < 8; i++ )
-    {
-      data_to_send1[i + 3] = current_state[i];
-    }
+//     data_to_send1[0] = 0xAA;
+//     data_to_send1[1] = 0x02;
+//     data_to_send1[2] = 0x08;
 
-    for (int i = 0 ; i < 11 ; i++)
-    {
-       checksum += data_to_send1[i];
-    }
-    data_to_send1[12] = checksum;
-    length = 13;
+//     for (int i = 0; i < 8; i++ )
+//     {
+//       data_to_send1[i + 3] = current_state[i];
+//     }
 
-    ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle);
+//     for (int i = 0 ; i < 11 ; i++)
+//     {
+//        checksum += data_to_send1[i];
+//     }
+//     data_to_send1[12] = checksum;
+//     length = 13;
 
-}
+//     ble_nus_data_send(&m_nus, data_to_send1, &length, m_conn_handle);
+
+// }
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //---------------------------------------------------------------------send_err----------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Send error message to the App.
+ *
+ * @param err_type
+ * @param err_pos
+ */
 void send_err(uint8_t err_type ,uint8_t err_pos)
 {
     uint8_t data_to_send1[6] = {0};
@@ -1230,7 +1285,11 @@ void send_err(uint8_t err_type ,uint8_t err_pos)
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
 //------------------------------------------------------------------------init_dcb-------------------------------------------------------------------//
 //---------------------------------------------------------------------------------------------------------------------------------------------------//
-
+/**
+ * @brief Initiate HW GPIO
+ *
+ * @return int
+ */
 int init_dcb()
 {
   int i;
@@ -1250,6 +1309,7 @@ int init_dcb()
   nrf_gpio_cfg_input(ADC_PD0,NRF_GPIO_PIN_NOPULL);
   nrf_gpio_cfg_input(ADC_PD1,NRF_GPIO_PIN_NOPULL);
 
+
   nrf_gpio_cfg_output(EN_PD);
   nrf_gpio_cfg_output(EN_AMP);
   nrf_gpio_cfg_output(EN_BLOCK);
@@ -1261,13 +1321,18 @@ int init_dcb()
   nrf_gpio_cfg_output(TP7);
   read_board_position();
 
-  
+
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
 //--------------------------------------------------------------------------set_addr------------------------------------------------------------------//
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
-
+/**
+ * @brief Set address of the cell to read.
+ *
+ * @param addr_num
+ * @return int
+ */
 int set_addr(uint8_t addr_num)
 {
   if ((addr_num < 4) && (addr_num >= 0))
@@ -1341,6 +1406,12 @@ int set_analog_mux(uint8_t ana_num)
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
 //---------------------------------------------------------------------- set_block--------------------------------------------------------------------//
 //----------------------------------------------------------------------------------------------------------------------------------------------------//
+/**
+ * @brief Set the block
+ * There are 8 block in each block 8 cells
+ * @param block_num
+ * @return int
+ */
 int set_block(uint8_t block_num)
 {
   if ((block_num < 8) && (block_num >= 0))
@@ -1430,10 +1501,13 @@ int read_board_position(void)
   {
     global_index = index_B;
     //nrf_gpio_pin_set(TP2);
+
+    /*This GPIO discharge the capacitor in the input of the opAMP(connects it to GND)*/
     nrf_gpio_pin_set(TP5);
     set_block(board_lookup[index_B] >> 4);
     set_addr((board_lookup[index_B] >> 2) & 3);
     set_analog_mux((board_lookup[index_B]) & 3);
+    /*After setting the muxes, release the mosfet to allow measurments*/
     nrf_gpio_pin_clear(TP5);
 
     nrf_delay_us(ANALOG_MUX_DELAY_US);
@@ -2224,8 +2298,8 @@ int main(void)
                       pause_game_flag = false;
                       Flag_EOM_timer = false;
                       for (int i = 0; i < 64; i++ )
-                      {                        
-                        current_state_board[i] = recovery_current_state_board[i];                        
+                      {
+                        current_state_board[i] = recovery_current_state_board[i];
                       }
                   }
                   else
@@ -2323,7 +2397,7 @@ int main(void)
           }
           else
             EOM_counter =0;
-        }        
+        }
       }
       //idle_state_handle();
     }
