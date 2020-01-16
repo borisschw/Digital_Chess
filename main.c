@@ -123,6 +123,10 @@
 #define QUEEN_W   0x15
 #define KING_W 		0x16
 
+#define SW_BLACK 7
+#define SW_WHITE 8
+
+
 
 /*Module Pin defines*/
 #define BLOCK_ADDR0 13
@@ -304,6 +308,7 @@ volatile _Bool Flag_EOM_timer = false;
 volatile _Bool start_of_game_flag = false;
 volatile _Bool SOG_update_flag = true;
 volatile _Bool flag_castling;
+volatile uint32_t adc_treshold = 7;
 
 /*Indicated that end of move command should be sent*/
 volatile _Bool send_EOM_flag = false;
@@ -1309,6 +1314,13 @@ int init_dcb()
   nrf_gpio_cfg_input(ADC_PD0,NRF_GPIO_PIN_NOPULL);
   nrf_gpio_cfg_input(ADC_PD1,NRF_GPIO_PIN_NOPULL);
 
+  nrf_gpio_cfg_input(ADC_PD0,NRF_GPIO_PIN_NOPULL);
+  nrf_gpio_cfg_input(ADC_PD1,NRF_GPIO_PIN_NOPULL);
+
+  /*Those 2 inputs for changeing the Threshold of the ADC*/
+  nrf_gpio_cfg_input(SW_BLACK,NRF_GPIO_PIN_NOPULL);
+  nrf_gpio_cfg_input(SW_WHITE,NRF_GPIO_PIN_NOPULL);
+
 
   nrf_gpio_cfg_output(EN_PD);
   nrf_gpio_cfg_output(EN_AMP);
@@ -1734,13 +1746,13 @@ int read_adc(_Bool *val)
 //    {
 //       nrf_gpio_pin_set(TP6);
 //    }
-    if (ADC_result[0] < THRESHOLD) // AN2 chanel X
+    if (ADC_result[0] < adc_treshold) // AN2 chanel X
         val[0] = true;
     else
         val[0] = false;
 
 
-    if (ADC_result[1] < THRESHOLD)//AN0 chanel Y
+    if (ADC_result[1] < adc_treshold)//AN0 chanel Y
         val[1] = true;
     else
         val[1] = false;
@@ -2216,6 +2228,7 @@ int main(void)
     int size_of_packet;
     uint8_t ind;
     uint8_t a, b;
+    uint32_t gpio_P07_value;
     a = 1;
 
     init_dcb();
@@ -2362,6 +2375,14 @@ int main(void)
         /* If there is no error, continue to operate*/
         if(!pause_game_flag)
         {
+          /* Read gpio to set Threshhold for ADC*/
+          gpio_P07_value = nrf_gpio_pin_read(SW_BLACK);
+          if (gpio_P07_value == 1)
+            adc_treshold = 14;
+          else
+            adc_treshold = 7;
+
+
           /*Read board and set the new_state[8] array.*/
           read_board_position();
 
