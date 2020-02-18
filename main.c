@@ -164,9 +164,10 @@
 #define ANALOG_MUX_DELAY_US 5
 #define DEBOUNCE_VAL_slow 10
 #define DEBOUNCE_VAL_fast 0
-#define THRESHOLD 7
 #define EOM_THRESHOLD 100 // 150*3mSec =750msec
 
+#define HIGH_ADC_THRESHOLD 7
+#define LOW_ADC_THRESHOLD 4
 
 /**
  * @brief commands to and from Android App
@@ -1871,7 +1872,7 @@ int move_algo(uint8_t change_val, _Bool reset)
       {
         /*If a plyer lifted a piece and placed it on the same place(the player lifted by mistake),
         send error to APP and wait for resume - turn not changing*/
-        if (current_state_board[place] == recovery_current_state_board[place])
+        if (current_state_board[place] != recovery_current_state_board[place])
         {
           return 0;
         }
@@ -2384,9 +2385,9 @@ int main(void)
           /* Read gpio to set Threshhold for ADC*/
           gpio_P07_value = nrf_gpio_pin_read(SW_BLACK);
           if (gpio_P07_value == 1)
-            adc_treshold = 14;
+            adc_treshold = HIGH_ADC_THRESHOLD;
           else
-            adc_treshold = 7;
+            adc_treshold = LOW_ADC_THRESHOLD;
 
 
           /*Read board and set the new_state[8] array.*/
