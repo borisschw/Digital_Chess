@@ -166,8 +166,8 @@
 #define DEBOUNCE_VAL_fast 0
 #define EOM_THRESHOLD 100 // 150*3mSec =750msec
 
-#define HIGH_ADC_THRESHOLD 7
-#define LOW_ADC_THRESHOLD 4
+#define HIGH_ADC_THRESHOLD 1018
+#define LOW_ADC_THRESHOLD 5
 
 /**
  * @brief commands to and from Android App
@@ -1495,6 +1495,7 @@ int read_board_position(void)
   int a,b;
   uint8_t line_val0;
   uint8_t line_val1;
+  uint8_t block_num = 0;
   a = 1;
 
 
@@ -1514,10 +1515,10 @@ int read_board_position(void)
   {
     global_index = index_B;
     //nrf_gpio_pin_set(TP2);
-
+    block_num = board_lookup[index_B] >> 4;
     /*This GPIO discharge the capacitor in the input of the opAMP(connects it to GND)*/
     nrf_gpio_pin_set(TP5);
-    set_block(board_lookup[index_B] >> 4);
+    set_block(block_num);
     set_addr((board_lookup[index_B] >> 2) & 3);
     set_analog_mux((board_lookup[index_B]) & 3);
     /*After setting the muxes, release the mosfet to allow measurments*/
@@ -1739,8 +1740,8 @@ int read_adc(_Bool *val)
         ADC_result[0] = 0;
     if( ADC_result[1] < 0)
         ADC_result[1] = 0;
-        if (global_index>31)
-          global_index =31;
+    if (global_index>31)
+      global_index =31;
     odd_array[global_index]  =ADC_result[0];
     even_array[global_index] =ADC_result[1];
 //    if((global_index==12)&&(ADC_result[1]>10))
